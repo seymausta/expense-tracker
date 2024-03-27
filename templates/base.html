@@ -9,13 +9,17 @@
 </head>
 <body>
 {% include "navbar.html" %}
- <hr>
-    <div class="form">
-        {% block form %} {% endblock %}
-    </div>
-  <div class="container has-text-centered">
-        {% block content %} {% endblock %}
-    </div>
+<hr>
+<div class="form">
+    {% block form %} {% endblock %}
+</div>
+<div class="container has-text-centered">
+    {% block content %} {% endblock %}
+</div>
+
+<main class="container p-5 text-center">
+    {% block main %}{% endblock %}
+</main>
 
 
 
