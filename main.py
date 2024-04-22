@@ -1,13 +1,13 @@
 import psycopg2
 from flask import Flask, render_template, redirect, request, session, url_for
-from init_db import connect_to_database
+from init_db import get_database_connection, close_database_connection
 from helpers import login_required
+#from flask_wtf.csrf import CSRFProtect
 
 
 app = Flask(__name__)
 app.secret_key = "your_secret_key"
-
-conn = connect_to_database()
+#csrf = CSRFProtect(app)
 
 @app.route("/")
 def home():
@@ -23,6 +23,8 @@ def register():
         password = request.form["password"]
         name = request.form["name"]
         surname = request.form["surname"]
+
+        conn = get_database_connection()
 
         try:
             cur = conn.cursor()
@@ -45,6 +47,7 @@ def register():
             # Bağlantıyı kapat
             if cur:
                 cur.close()
+            close_database_connection(conn)
 
     return redirect("/login", 302)
 
@@ -57,6 +60,8 @@ def login():
         email = request.form["email"]
         password = request.form["password"]
 
+        conn = get_database_connection()
+
         try:
             cur = conn.cursor()
 
@@ -67,7 +72,6 @@ def login():
             if user:
                 # Kullanıcı varsa oturumu başlat
                 session['logged_in'] = True
-                #session['user'] = user
                 session['user_id'] = user[0]  # Kullanıcı kimliğini oturum içine kaydet
                 return redirect("/", 302)
             else:
@@ -82,6 +86,8 @@ def login():
             # Bağlantıyı kapat
             if cur:
                 cur.close()
+            close_database_connection(conn)
+
 @app.route("/logout")
 def logout():
     # Oturumu sonlandır
@@ -91,6 +97,7 @@ def logout():
 
 @app.route('/account')
 def account():
+    conn = get_database_connection()
     try:
         cur = conn.cursor()
 
@@ -116,6 +123,7 @@ def account():
         # Bağlantıyı kapat
         if cur:
             cur.close()
+        close_database_connection(conn)
 
 @app.route("/expenses", methods=["GET"])
 def expenses():
@@ -123,11 +131,10 @@ def expenses():
 
     return render_template("expenses.html")
 
-
 @login_required
 @app.route('/addexpenses', methods=['GET', 'POST'])
 def add_expense():
-    print("Form Data:", request.form)
+    conn = get_database_connection()
     if request.method == 'POST':
         # Formdan gelen verileri al
         amount = request.form["amount"]
@@ -135,7 +142,6 @@ def add_expense():
         category_id = request.form["category"]
         date = request.form["date"]
         description = request.form["description"]
-
 
         user_id = session.get('user_id')
 
@@ -166,6 +172,7 @@ def add_expense():
             # Bağlantıyı kapat
             if cur:
                 cur.close()
+            close_database_connection(conn)
 
     else:
         # GET isteği ise, kategorileri al ve harcama ekleme sayfasını render et
@@ -179,9 +186,6 @@ def add_expense():
 
             print("Categories:", categories)  # Kategorileri kontrol et
 
-            """for category in categories:
-                print(category.id, category.name)"""
-
             return render_template('addexpenses.html', categories=categories)
 
         except psycopg2.Error as e:
@@ -192,10 +196,12 @@ def add_expense():
             # Bağlantıyı kapat
             if cur:
                 cur.close()
+            close_database_connection(conn)
 
 @app.route('/expensehistory')
 @login_required  # Kullanıcı giriş yapmış olmalı
 def expense_history():
+    conn = get_database_connection()  # Veritabanı bağlantısını al
     if conn is None:
         return "Veritabanına bağlanırken bir hata oluştu."
 
@@ -205,9 +211,17 @@ def expense_history():
         # Kullanıcının id'sini al
         user_id = session.get('user_id')
 
-        # Kullanıcının harcamalarını veritabanından al
-        cur.execute("SELECT * FROM expenses WHERE user_id = %s", (user_id,))
-        history = cur.fetchall()
+        # Kullanıcının harcamalarını veritabanından sadece belirli sütunları alarak al
+        cur.execute("SELECT expense_name, amount, date, description, category_id,id FROM expenses WHERE user_id = %s", (user_id,))
+        expenses = cur.fetchall()
+
+        # Her bir harcama için kategori adını al ve yeni bir liste oluştur
+        history = []
+        for expense in expenses:
+            expense_name, amount, date, description, category_id,id = expense
+            cur.execute("SELECT name FROM categories WHERE id = %s", (category_id,))
+            category_name = cur.fetchone()[0]  # Kategori adını al
+            history.append((expense_name, amount, date, description, category_name,id))
 
         # HTML sayfasına verileri aktar
         return render_template('expensehistory.html', history=history)
@@ -220,6 +234,119 @@ def expense_history():
         # PostgreSQL bağlantısını kapat
         if conn:
             conn.close()
+
+@app.route('/deleteexpense/<int:expense_id>', methods=['POST'])
+@login_required
+def delete_expense(expense_id):
+    conn = get_database_connection()
+    if conn is None:
+        return "Veritabanına bağlanırken bir hata oluştu."
+
+    try:
+        cur = conn.cursor()
+
+        # Kullanıcının giriş yapmış olduğunu kontrol et
+        user_id = session.get('user_id')
+        if user_id is None:
+            return "Oturum açmış bir kullanıcı bulunamadı."
+
+        # Kullanıcının belirtilen harcamayı silebilmesi için gerekli yetkilere sahip olduğunu kontrol et
+        cur.execute("SELECT user_id FROM expenses WHERE id = %s", (expense_id,))
+        result = cur.fetchone()
+
+        if result is not None and result[0] == user_id:
+            # Belirtilen harcamayı sil
+            cur.execute("DELETE FROM expenses WHERE id = %s", (expense_id,))
+            conn.commit()
+            return redirect(url_for('expense_history'))
+        else:
+            return "Bu harcamayı silme izniniz yok."
+
+        # Belirtilen harcamayı sil
+        cur.execute("DELETE FROM expenses WHERE id = %s", (expense_id,))
+        conn.commit()
+
+        return redirect(url_for('expense_history'))
+
+    except psycopg2.Error as e:
+        print("Hata:", e)
+        return "Harcama silinirken bir hata oluştu."
+
+    finally:
+        # Bağlantıyı kapat
+        if conn:
+            conn.close()
+
+
+@app.route('/updateexpense/<int:expense_id>', methods=['GET', 'POST'])
+@login_required
+def update_expense(expense_id):
+    conn = get_database_connection()
+    if request.method == 'POST':
+        if conn is None:
+            return "Veritabanına bağlanırken bir hata oluştu."
+
+        try:
+            cur = conn.cursor()
+
+            # Kullanıcının giriş yapmış olduğunu kontrol et
+            user_id = session.get('user_id')
+            if user_id is None:
+                return "Oturum açmış bir kullanıcı bulunamadı."
+
+            # Kullanıcının belirtilen harcamayı güncelleyebilmesi için gerekli yetkilere sahip olduğunu kontrol et
+            cur.execute("SELECT user_id FROM expenses WHERE id = %s", (expense_id,))
+            result = cur.fetchone()
+            if not result or result[0] != user_id:
+                return "Bu harcamayı güncelleme izniniz yok."
+
+            # Requestten form verilerine erişin
+            new_name = request.form["newName"]
+            new_amount = request.form["newAmount"]
+            new_category = request.form["newCategory"]
+            new_date = request.form["newDate"]
+            new_description = request.form["newDescription"]
+
+            # Harcamayı güncelle
+            cur.execute(
+                "UPDATE expenses SET expense_name = %s, amount = %s, category_id = %s, date = %s, description = %s WHERE id = %s",
+                (new_name, new_amount, new_category, new_date, new_description, expense_id))
+            conn.commit()
+
+            return redirect(url_for('expensehistory'))
+
+        except psycopg2.Error as e:
+            print("Hata:", e)
+            return "Harcama güncellenirken bir hata oluştu."
+
+        finally:
+            # Bağlantıyı kapat
+            if conn:
+                conn.close()
+    else:
+        # GET isteği ise, kategorileri al ve harcama ekleme sayfasını render et
+        try:
+            cur = conn.cursor()
+
+            # Kategorileri veritabanından al
+            cur.execute("SELECT id, name FROM categories")
+            rows = cur.fetchall()
+            categories = [{'id': row[0], 'name': row[1]} for row in rows]
+
+            print("Categories:", categories)  # Kategorileri kontrol et
+
+            return render_template('expensehistory.html', categories=categories)
+
+        except psycopg2.Error as e:
+            print("Hata:", e)
+            return "Kategoriler alınırken bir hata oluştu."
+
+        finally:
+            # Bağlantıyı kapat
+            if cur:
+                cur.close()
+            close_database_connection(conn)
+
 
 if __name__ == '__main__':
     app.run(debug=True, host="0.0.0.0", port=5000)

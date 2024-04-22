@@ -1,68 +1,123 @@
 {% extends "base.html" %}
 
 {% block title %}
-    Expense History
+Expense History
 {% endblock %}
 
 {% block styles %}
-    <!-- DataTables CSS -->
-    <link href="https://cdn.datatables.net/1.10.20/css/jquery.dataTables.min.css" rel="stylesheet">
-    <!-- Your custom styles -->
-    <link href="/static/css/lib/expenses.css" rel="stylesheet">
+<!-- DataTables CSS -->
+<link href="https://cdn.datatables.net/1.10.20/css/jquery.dataTables.min.css" rel="stylesheet">
+<!-- Your custom styles -->
+<link href="/static/css/lib/expenses.css" rel="stylesheet">
 {% endblock %}
 
 {% block main %}
-    <h1>Expense History</h1>
+<h1>Expense History</h1>
 
-    {% if history %}
-        <!--Table functionality courtesy of DataTables.net-->
-        <table id="expenses" class="display" style="width:100%">
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Payer</th>
-                    <th>Description</th>
-                    <th>Category</th>
-                    <th>Date</th>
-                    <th>Amount</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for expense in history %}
-                    <tr>
-                        <td>{{ loop.index }}</td>
-                        <td>{{ expense[1] }}</td>
-                        <td>{{ expense[2] }}</td>
-                        <td>{{ expense[3] }}</td>
-                        <td>{{ expense[4] }}</td>
-                        <td>{{ expense[5] }}</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    {% else %}
-        <p>You don't have any expenses yet 😥</p>
-    {% endif %}
+{% if history %}
+<!--Table functionality courtesy of DataTables.net-->
+<table id="expenses" class="display" style="width:100%">
+    <thead>
+    <tr>
+        <th>#</th>
+        <th>Name</th>
+        <th>Amount</th>
+        <th>Category</th>
+        <th>Date</th>
+        <th>Description</th>
+        <th>Action</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for expense in history %}
+    <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ expense[0] }}</td>
+        <td>{{ expense[1] }}</td>
+        <td>{{ expense[4] }}</td>
+        <td>{{ expense[2] }}</td>
+        <td>{{ expense[3] }}</td>
+        <td>
+            <form action="/deleteexpense/{{ expense[5] }}" method="post">
+                <button type="submit" class="btn btn-danger">Delete</button>
+            </form>
+            <button type="button" class="btn btn-primary" data-toggle="modal"
+                    data-target="#updateModal{{ expense[5] }}"> Update </button>
+        </td>
+    </tr>
+
+    <!-- Modal -->
+    <div class="modal fade" id="updateModal{{ expense[5] }}" tabindex="-1" role="dialog"
+         aria-labelledby="updateModalLabel{{ expense[5] }}" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="updateModalLabel{{ expense[5] }}">Update Expense</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <!-- Güncelleme formu -->
+                    <form action="/updateexpense/{{ expense[5] }}" method="post">
+                        <!-- Gerekli form alanlarını buraya ekleyin -->
+                        <div class="form-group">
+                            <label for="newName">New Name:</label>
+                            <input type="text" class="form-control" id="newName" name="newName"
+                                   value="{{ expense[0] }}">
+                        </div>
+                        <div class="form-group">
+                            <label for="newAmount">New Amount:</label>
+                            <input type="text" class="form-control" id="newAmount" name="newAmount"
+                                   value="{{ expense[1] }}">
+                        </div>
+                        <div class="form-group">
+                            <label for="newCategory">New Category:</label>
+                            <select class="form-control" id="newCategory" name="newCategory">
+                                {% for category in categories %}
+                                    <option value="{{ category['id'] }}">{{ category['name'] }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="newDate">New Date:</label>
+                            <input type="date" class="form-control" id="newDate" name="newDate"
+                                   value="{{ expense[2] }}">
+                        </div>
+                        <div class="form-group">
+                            <label for="newDescription">New Description:</label>
+                            <input type="text" class="form-control" id="newDescription" name="newDescription"
+                                   value="{{ expense[3] }}">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Update Expense</button>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>You don't have any expenses yet 😥</p>
+{% endif %}
 
 {% endblock %}
 
 {% block scripts %}
-    <!-- jQuery -->
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <!-- DataTables -->
-    <script src="https://cdn.datatables.net/1.10.20/js/jquery.dataTables.min.js"></script>
-    <!-- DataTables Buttons -->
-    <script src="https://cdn.datatables.net/buttons/1.6.1/js/dataTables.buttons.min.js"></script>
-    <script src="https://cdn.datatables.net/buttons/1.6.1/js/buttons.flash.min.js"></script>
-    <!-- DataTables PDFMake -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
-    <!-- DataTables HTML5 export -->
-    <script src="https://cdn.datatables.net/buttons/1.6.1/js/buttons.html5.min.js"></script>
-    <!-- Custom script for initializing DataTables -->
-    <script>
-        $(document).ready(function() {
-            $('#expenses').DataTable();
-        });
-    </script>
+<!-- jQuery -->
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<!-- Bootstrap JS -->
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<!-- DataTables -->
+<script src="https://cdn.datatables.net/1.10.20/js/jquery.dataTables.min.js"></script>
+
+<script>
+    $(document).ready(function() {
+        $('#expenses').DataTable();
+    });
+</script>
 {% endblock %}

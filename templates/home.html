@@ -1,1 +1,44 @@
 {% extends "base.html" %}
+
+   <div class="modal fade" id="updateModal{{ expense[5] }}" tabindex="-1" role="dialog" aria-labelledby="updateModalLabel{{ expense[5] }}" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="updateModalLabel{{ expense[5] }}">Update Expense</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Güncelleme formu -->
+                <form action="/updateexpense/{{ expense[5] }}" method="post">
+                    <!-- Gerekli form alanlarını buraya ekleyin -->
+                    <div class="form-group">
+                        <label for="newName">New Name:</label>
+                        <input type="text" class="form-control" id="newName" name="newName" value="{{ expense[0] }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="newAmount">New Amount:</label>
+                        <input type="text" class="form-control" id="newAmount" name="newAmount" value="{{ expense[1] }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="newCategory">New Category:</label>
+                        <input type="text" class="form-control" id="newCategory" name="newCategory" value="{{ expense[4] }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="newDate">New Date:</label>
+                        <input type="date" class="form-control" id="newDate" name="newDate" value="{{ expense[2] }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="newDescription">New Description:</label>
+                        <input type="text" class="form-control" id="newDescription" name="newDescription" value="{{ expense[3] }}">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Update Expense</button>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
